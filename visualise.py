@@ -1,5 +1,5 @@
-import pandas as pd
-import matplotlib.pyplot as plt
+import pandas as pd # type: ignore
+import matplotlib.pyplot as plt # type: ignore
 
 def main():
     route_a = pd.read_csv("data/results/route_a_energy.csv")
