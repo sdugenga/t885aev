@@ -2,13 +2,6 @@ import math
 import csv
 import time
 
-
-# TODO: Gather together route data and put it into a suitable data structure
-# TODO: Iterate over the route data data structure to get route energy
-# TODO: Visualise the route energy usage
-# TODO: Visualise the route topography and distance etc.
-# TODO: I need to get a calculation together to get a radians value in the incline section
-
 def main():
     # vehicle design parameters from Julians spreadsheets etc.
     parameters = {'max_velocity': convert_mph_ms(25),
@@ -173,52 +166,3 @@ def power_required(acceleration,
 
 if __name__ == "__main__":
     main()
-
-'''
-    # These should not be dependent on the max accel decel values
-    cruise_distance = example_segment_length - max_accel_distance - max_decel_distance
-    cruise_time = cruise_distance / max_velocity 
-    total_segment_time = max_accel_time + max_decel_time + cruise_time
-
-    # From here we are carrying out calculations on a given segment
-    rounded_time = math.ceil(total_segment_time)
-
-    segment_energy = 0
-    for t in range(rounded_time):
-        # Period where vehicle is accelerating
-        if t < accel_time:
-            acceleration = max_accel
-            velocity = max_accel * t
-            print(f"accelerating...")
-        # Period where vehicle is cruising
-        elif t < accel_time + cruise_time:
-            acceleration = 0
-            velocity = max_velocity
-            print(f"cruising...")
-        # Period where vehicle is decelerating
-        elif t < total_segment_time:
-            acceleration = -max_decel
-            velocity = max_velocity - max_decel * (t - accel_time - cruise_time)
-            print(f"decelerating...")
-        # Set to 0 where period exceeds actual max period due to rounding
-        else:
-            acceleration = 0
-            velocity = 0
-
-        power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
-        if power > 0:
-            segment_energy += power
-            # This is where I might add some regen in to the equation
-        print(f"power at time {t} = {power}")
-        print(f"segment energy at time {t} = {segment_energy}")
-
-    print(f"max speed = {max_velocity}")
-    print(f"acceleration time = {accel_time}")
-    print(f"deceleration time = {decel_time}")
-    print(f"acceleration distance = {accel_distance}")
-    print(f"deceleration distance = {decel_distance}")
-    print(f"cruise distance = {cruise_distance}")
-    print(f"cruise time = {cruise_time}")
-    print(f"total segment time = {total_segment_time}")
-
-'''
