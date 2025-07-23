@@ -35,6 +35,22 @@ def main():
 
     # extract the first moving segment to work on as a test
     moving_keys = [key for key in segments.keys() if 'moving' in key]
+
+    processed_segments = []
+
+    for key in moving_keys:
+        segment = segments[key]
+        segment_length = segment['incremental_distance'].sum()
+
+        simulated_segment = process_segment(segment_length, parameters)
+        simulated_segment = resample_dataframe(simulated_segment)
+
+        simulated_segment['segment_key'] = key
+
+        processed_segments.append(simulated_segment)
+
+
+
     first_moving_key = moving_keys[0]
     first_moving_segment = segments[first_moving_key]
 
@@ -42,6 +58,7 @@ def main():
     segment_length = first_moving_segment['incremental_distance'].sum()
 
     segment_dataframe = process_segment(segment_length, parameters)
+    segment_dataframe = resample_dataframe(segment_dataframe)
 
     segment_dataframe.to_csv(f"data/processed/{first_moving_key}_processed.csv")
     print(f"New file generated")
@@ -58,7 +75,7 @@ def convert_mph_ms(mph):
 
 def process_segment(segment_length, parameters):
     # set up initial variables for segment processing
-    dt = 1
+    dt = 0.1
     position = 0
     segment_time = 0
     velocity = 0
@@ -90,7 +107,7 @@ def process_segment(segment_length, parameters):
 
         incremental_distance = velocity * dt
 
-        # if the next step would overshoot, trum and break the loop
+        # if the next step would overshoot, trim and break the loop
         if position + incremental_distance >= segment_length:
             incremental_distance = segment_length - position
             position = segment_length
@@ -141,6 +158,7 @@ def process_segment(segment_length, parameters):
 
 def decide_acceleration(pos, v, len, v_max, a_max, d_max):
     distance_remaining = len - pos
+
     if v > 0:
         stopping_distance = np.power(v, 2)/(2*d_max)
     else:
@@ -168,6 +186,15 @@ def power_required(acceleration,
     # unsure about negative incline here
     power = 0.6125*frontal_area*drag*np.power(velocity, 3)+9.81*mass*velocity*(rolling_resistance+incline+0.107*acceleration)
     return(power)
+
+
+def resample_dataframe(dataframe):
+    # keeping the last and first index:
+    indices = [0] + list(range(10, len(dataframe) -1, 10)) + [len(dataframe)-1]
+    resampled_dataframe = dataframe.iloc[indices].reset_index(drop=True)
+
+    resampled_dataframe['time_s'] = np.arange(len(resampled_dataframe))
+    return resampled_dataframe
 
 
 if __name__ == "__main__":
