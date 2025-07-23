@@ -41,7 +41,10 @@ def main():
     # calculate the distance for this segment
     segment_length = first_moving_segment['incremental_distance'].sum()
 
-    process_segment(segment_length, parameters)
+    segment_dataframe = process_segment(segment_length, parameters)
+
+    segment_dataframe.to_csv(f"data/processed/{first_moving_key}_processed.csv")
+    print(f"New file generated")
 
 
 def convert_mph_ms(mph):
@@ -73,6 +76,8 @@ def process_segment(segment_length, parameters):
     # calculate the incline of the segment
     incline = 0
 
+    rows = []
+
     while position < segment_length:
         # decide whether the vehicle is accelerating or decelerating
         acceleration = decide_acceleration(position, velocity, segment_length, max_velocity, max_accel, max_decel)
@@ -82,22 +87,56 @@ def process_segment(segment_length, parameters):
         velocity = max(0, min(velocity, max_velocity))
         # checks if the next step will take us beyond the final position
         # this would basically stop the vehicle just short of the actual segment length
-        if position + velocity * dt > segment_length:
+
+        incremental_distance = velocity * dt
+
+        # if the next step would overshoot, trum and break the loop
+        if position + incremental_distance >= segment_length:
+            incremental_distance = segment_length - position
             position = segment_length
-            segment_time += dt
+
+            velocity = 0
+        
+            # Calculate power at given time segment
+            power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
+            if power > 0:
+                segment_energy += power
+                
+                
+                # This is where I might add some regen in to the equation
+
+            rows.append({'time_s': segment_time,
+                        'speed_ms': velocity,
+                        'incremental_distance': incremental_distance,
+                        'cumulative_distance': position,
+                        'acceleration_mss': acceleration,
+                        'power_W': power,
+                        'incremental_energy_J': power,
+                        'cumulative_energy_J': segment_energy
+            })
+
             break
-        else:
-            position += velocity * dt
-            # increment time
-            segment_time += dt
+        
+        position += incremental_distance
 
         # Calculate power at given time segment
         power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
         if power > 0:
             segment_energy += power
-            # This is where I might add some regen in to the equation
 
-    return segment_energy, segment_time
+        rows.append({'time_s': segment_time,
+                     'speed_ms': velocity,
+                     'incremental_distance': incremental_distance,
+                     'cumulative_distance': position,
+                     'acceleration_mss': acceleration,
+                     'power_W': power,
+                     'incremental_energy_J': power,
+                     'cumulative_energy_J': segment_energy
+        })
+
+        segment_time += dt
+
+    return pd.DataFrame(rows)
 
 
 def decide_acceleration(pos, v, len, v_max, a_max, d_max):
