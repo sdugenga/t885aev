@@ -31,36 +31,76 @@ def main():
     for segment_number, segment_df in dataframe.groupby('segment_number'):
         segment_type = segment_df['segment_type'].iloc[0]
         key = f"segment{segment_number}_{segment_type}"
+        
+        segment_df = segment_df.copy().reset_index(drop=True)
+        segment_df['time_s'] = np.arange(len(segment_df))
+        segment_df['segment_number'] = int(segment_number)
+        
         segments[key] = segment_df
 
-    # extract the first moving segment to work on as a test
-    moving_keys = [key for key in segments.keys() if 'moving' in key]
+    ### START STITCHING BACK TOGETHER HERE ###
 
-    processed_segments = []
+    stitched_segments = []
+    time_offset = 0
 
-    for key in moving_keys:
+    ordered_keys = sorted(segments.keys(), key=lambda x: int(x.split('_')[0].replace('segment', '')))
+
+    for key in ordered_keys:
         segment = segments[key]
-        segment_length = segment['incremental_distance'].sum()
+        # check if the segment is a moving segment or not
+        if 'moving' in key:
+            # if it is a moving segment, it needs to be processed and we need the distance
+            segment_length = segment['incremental_distance'].sum()
+            # then we can process it based on the length and parameters
+            simulated_segment = process_segment(segment_length, parameters)
+            # simulated_segment = resample_dataframe(simulated_segment)
+            # the time column needs to be adjusted so it all lines up
+            simulated_segment['time_s'] += time_offset
+            # and the time offset needs to be updated for the next segment
+            time_offset = simulated_segment['time_s'].iloc[-1] + 1
+            # then we can append the simulated segment to the list of segments
+            segment_number = int(key.split('_')[0].replace('segment', ''))
+            simulated_segment['segment_number'] = segment_number
+            stitched_segments.append(simulated_segment)
+        else:
+            # the same process for the stopped segments
+            segment = segment.copy()
+            segment['time_s'] += time_offset
+            time_offset = segment['time_s'].iloc[-1] + 1
+            stitched_segments.append(segment)
 
-        simulated_segment = process_segment(segment_length, parameters)
-        simulated_segment = resample_dataframe(simulated_segment)
+    stitched_df = pd.concat(stitched_segments, ignore_index=True)
 
-        simulated_segment['segment_key'] = key
+    cols_to_drop = [
+        col for col in stitched_df if col.startswith('Unnamed')] + [
+            'speed_mph',
+            'speed_mph_capped',
+            'cumulative_distance',
+            'cumulative_energy_J',
+            'segment_type'
+        ]
+    
+    stitched_df = stitched_df.drop(columns=[
+        col for col in cols_to_drop if col in stitched_df.columns
+    ])
 
-        processed_segments.append(simulated_segment)
+    stitched_df['cumulative_distance'] = stitched_df['incremental_distance'].cumsum()
+    stitched_df['cumulative_energy'] = stitched_df['incremental_energy_J'].cumsum()
 
+    cols = list(stitched_df.columns)
 
+    cols.remove('cumulative_distance')
+    cols.remove('cumulative_energy')
 
-    first_moving_key = moving_keys[0]
-    first_moving_segment = segments[first_moving_key]
+    distance_idx = cols.index('incremental_distance') + 1
+    energy_idx = cols.index('incremental_energy_J') + 1
 
-    # calculate the distance for this segment
-    segment_length = first_moving_segment['incremental_distance'].sum()
+    cols.insert(distance_idx, 'cumulative_distance')
+    cols.insert(energy_idx, 'cumulative_energy')
 
-    segment_dataframe = process_segment(segment_length, parameters)
-    segment_dataframe = resample_dataframe(segment_dataframe)
+    stitched_df = stitched_df[cols]
 
-    segment_dataframe.to_csv(f"data/processed/{first_moving_key}_processed.csv")
+    stitched_df.to_csv(f"data/processed/stitched_data.csv")
     print(f"New file generated")
 
 
