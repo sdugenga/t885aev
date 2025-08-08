@@ -157,7 +157,7 @@ def process_segment(segment_length, parameters):
             # Calculate power at given time segment
             power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
             if power > 0:
-                segment_energy += power
+                segment_energy += power * dt
                 
                 
                 # This is where I might add some regen in to the equation
@@ -168,7 +168,7 @@ def process_segment(segment_length, parameters):
                         'cumulative_distance': position,
                         'acceleration_mss': acceleration,
                         'power_W': power,
-                        'incremental_energy_J': power,
+                        'incremental_energy_J': power * dt,
                         'cumulative_energy_J': segment_energy
             })
 

@@ -109,6 +109,7 @@ def process_segment(segment_length, segment_elev_change, parameters):
 
         # update velocity and position
         velocity += acceleration * dt
+        # dont allow velocity to drop below zero
         velocity = max(0, min(velocity, max_velocity))
         # checks if the next step will take us beyond the final position
         # this would basically stop the vehicle just short of the actual segment length
@@ -124,7 +125,7 @@ def process_segment(segment_length, segment_elev_change, parameters):
         # Calculate power at given time segment
         power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
         if power > 0:
-            segment_energy += power
+            segment_energy += power * dt
             # This is where I might add some regen in to the equation
 
     return segment_energy, segment_time
