@@ -19,7 +19,7 @@ def process_segment(segment_length, segment_elev_change, parameters):
 
     while position < segment_length:
         # decide whether the vehicle is accelerating or decelerating
-        acceleration = decide_acceleration(position, velocity, segment_length, parameters)
+        acceleration = decide_acceleration(dt, position, velocity, acceleration, segment_length, parameters)
 
         # update velocity and position
         # cap velocity between zero and max velocity
@@ -56,7 +56,7 @@ def process_segment(segment_length, segment_elev_change, parameters):
     return segment_energy, segment_time
 
 
-def decide_acceleration(position, velocity, current_acceleration, segment_length, parameters):
+def decide_acceleration(dt, position, velocity, current_acceleration, segment_length, parameters):
     # determing target acceleration considering jerk limits and stopping distance
     
     # get the required variables out of the parameters dict
@@ -72,13 +72,24 @@ def decide_acceleration(position, velocity, current_acceleration, segment_length
 
     if distance_remaining <= current_stopping_distance:
         # need to start decelerating to stop in time
-        return -decel_max
-    elif v < v_max:
+        target_acceleration = -max_accel
+    elif velocity < max_velocity:
         # can keep accelerating up to max velocity
-        return a_max
+        target_acceleration = max_accel
     else:
         # continue to cruise at max velocity
-        return 0
+        target_acceleration = 0
+
+    max_accel_change = max_jerk * dt
+    accel_difference = target_acceleration - current_acceleration
+
+    if abs(accel_difference) <= max_accel_change:
+        return target_acceleration
+    else:
+        if accel_difference > 0:
+            return current_acceleration + max_accel_change
+        else:
+            return current_acceleration - max_accel_change
     
 
 def calculate_stopping_distance(velocity, current_accel, max_accel, max_jerk):
@@ -89,14 +100,14 @@ def calculate_stopping_distance(velocity, current_accel, max_accel, max_jerk):
     
     # calculate the time and distance in the phase affected by jerk
     if current_accel > target_decel:
-        jerk_phase_time = (current_accel - max_accel) / max_jerk
+        jerk_phase_time = (current_accel - target_decel) / max_jerk
         jerk_phase_distance = ((velocity * jerk_phase_time) + (0.5 * current_accel * jerk_phase_time**2) - ((1/6) * max_jerk * jerk_phase_time**3))
         velocity_after_jerk_phase = (velocity + (current_accel * jerk_phase_time) - (0.5 * max_jerk * jerk_phase_time**2))
     else:
         # already at or beyond max decel, then there is no jerk phase
         jerk_phase_time = 0
         jerk_phase_distance = 0
-        velocity_after_jerk_phase = 0
+        velocity_after_jerk_phase = velocity
 
     if velocity_after_jerk_phase > 0:
         # this is just that standard equation that I do need to find from somewhere to justify
@@ -107,7 +118,7 @@ def calculate_stopping_distance(velocity, current_accel, max_accel, max_jerk):
     # combine the jerk phase with the constant decel phase distances
     total_stopping_distance = jerk_phase_distance + constant_decel_distance
     # this could have a margin of error added to it if necessary but keeping it raw for now
-    return constant_decel_distance
+    return total_stopping_distance
 
 def power_required(acceleration, velocity, incline, parameters):
     drag = parameters["drag"]
