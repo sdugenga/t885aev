@@ -1,5 +1,31 @@
 import math
 import numpy as np
+import pandas as pd
+
+
+def convert_mph_ms(mph):
+    metres_in_mile = 1609.344 # constant (source)
+    seconds_in_hour = 3600 # s/h
+    miles_per_second = mph/seconds_in_hour # miles/s
+    metres_per_second = miles_per_second*metres_in_mile
+    
+    return metres_per_second
+
+
+VEHICLE_PARAMETERS = {
+    'max_velocity': convert_mph_ms(25), # mph
+    'max_accel': 2, # m/s/s
+    'max_jerk' : 2.5, # m/s/s/s
+    'drag': 0.5, # coefficient?
+    'rolling_resistance': 0.03, # coefficient?
+    'mass': 1350, # kg
+    'frontal_area': 2.646 # m^2
+}
+
+
+def get_parameters():
+    # Return a copy of the default parameters dict
+    return VEHICLE_PARAMETERS.copy()
 
 
 def process_segment(segment_length, segment_elev_change, parameters):
@@ -16,6 +42,9 @@ def process_segment(segment_length, segment_elev_change, parameters):
 
     # calculate the incline of the segment
     incline = calculate_incline(segment_length, segment_elev_change)
+
+    # store step by step results
+    rows = []
 
     while position < segment_length:
         # decide whether the vehicle is accelerating or decelerating
@@ -44,6 +73,18 @@ def process_segment(segment_length, segment_elev_change, parameters):
             # update time using fractional dt
             segment_time += fractional_dt
             position = segment_length
+
+            # update the rows list with the incremental information
+            rows.append({'time_s': segment_time,
+                        'speed_ms': velocity,
+                        'incremental_distance': remaining_distance,
+                        'cumulative_distance': position,
+                        'acceleration_mss': acceleration,
+                        'power_W': power,
+                        'incremental_energy_J': power * fractional_dt,
+                        'cumulative_energy_J': segment_energy
+            })
+
             break
         else:
             # if theres no overshoot then can update as usual
@@ -51,9 +92,24 @@ def process_segment(segment_length, segment_elev_change, parameters):
             segment_time += dt
             power = power_required(acceleration, velocity, incline, parameters)
             if power > 0:
-                segment_energy += power * dt
+                incremental_energy = power * dt
+            else:
+                incremental_energy = 0
+            segment_energy += incremental_energy
 
-    return segment_energy, segment_time
+        rows.append({'time_s': segment_time,
+                        'speed_ms': velocity,
+                        'incremental_distance': velocity * dt,
+                        'cumulative_distance': position,
+                        'acceleration_mss': acceleration,
+                        'power_W': power,
+                        'incremental_energy_J': power * dt,
+                        'cumulative_energy_J': segment_energy
+            })
+
+    segment_df = pd.DataFrame(rows)
+
+    return segment_df, segment_energy, segment_time
 
 
 def decide_acceleration(dt, position, velocity, current_acceleration, segment_length, parameters):
