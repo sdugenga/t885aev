@@ -2,13 +2,13 @@ import math
 import csv
 import time
 
-from aev_utils import decide_acceleration, power_required
+from aev_utils import process_segment
 
 def main():
     # vehicle design parameters from Julians spreadsheets etc.
     parameters = {'max_velocity': convert_mph_ms(25),
-                  'max_accel': 1,
-                  'max_decel': 1,
+                  'max_accel': 2,
+                  'max_jerk' : 2.5,
                   'drag': 0.5,
                   'rolling_resistance': 0.03,
                   'mass': 1350,
@@ -17,8 +17,8 @@ def main():
     
     start_time = time.time()
 
-    input_file = "data/segments/route_c_segments.csv"
-    output_file = "data/results/route_c_energy.csv"
+    input_file = "data/segments/route_a_segments.csv"
+    output_file = "data/results/route_a_energy_alt.csv"
 
     segments = []
     with open(input_file, 'r') as infile:
@@ -82,59 +82,6 @@ def convert_mph_ms(mph):
     metres_per_second = miles_per_second*metres_in_mile
     
     return metres_per_second
-
-
-def process_segment(segment_length, segment_elev_change, parameters):
-    # set up initial variables for segment processing
-    dt = 0.1
-    position = 0
-    segment_time = 0
-    velocity = 0
-    segment_energy = 0
-    
-    # get the variables out of the parameters dict
-    max_velocity = parameters['max_velocity']
-    max_accel = parameters['max_accel']
-    max_decel = parameters['max_decel']
-    drag = parameters['drag']
-    rolling_resistance = parameters['rolling_resistance']
-    mass = parameters['mass']
-    frontal_area = parameters['frontal_area']
-
-
-    # calculate the incline of the segment
-    incline = calculate_incline(segment_length, segment_elev_change)
-
-    while position < segment_length:
-        # decide whether the vehicle is accelerating or decelerating
-        acceleration = decide_acceleration(position, velocity, segment_length, max_velocity, max_accel, max_decel)
-
-        # update velocity and position
-        velocity += acceleration * dt
-        # dont allow velocity to drop below zero
-        velocity = max(0, min(velocity, max_velocity))
-        # checks if the next step will take us beyond the final position
-        # this would basically stop the vehicle just short of the actual segment length
-        if position + velocity * dt > segment_length:
-            position = segment_length
-            segment_time += dt
-            break
-        else:
-            position += velocity * dt
-            # increment time
-            segment_time += dt
-
-        # Calculate power at given time segment
-        power = power_required(acceleration, velocity, drag, rolling_resistance, incline, mass, frontal_area)
-        if power > 0:
-            segment_energy += power * dt
-            # This is where I might add some regen in to the equation
-
-    return segment_energy, segment_time
-
-
-def calculate_incline(run, rise):
-    return(math.atan(rise/run))
 
 
 if __name__ == "__main__":
