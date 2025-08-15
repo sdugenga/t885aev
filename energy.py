@@ -11,9 +11,9 @@ def main():
     
     start_time = time.time()
 
-    input_file = "data/segments/route_a_segments.csv"
-    output_file = "data/results/route_a_energy.csv"
-    output_detail_file = "data/results/route_a_detailed.csv"
+    input_file = "data/segments/route_c_segments.csv"
+    output_file = "data/results/route_c_energy.csv"
+    output_detail_file = "data/results/route_c_detailed.csv"
 
     segments = []
     with open(input_file, 'r') as infile:
@@ -75,6 +75,7 @@ def main():
     # save full detailed CSV
     stitched_df = pd.concat(all_detailed_segments, ignore_index=True)
     stitched_df['cumulative_distance'] = stitched_df['incremental_distance'].cumsum()
+    stitched_df['cumulative_energy_J'] = stitched_df['incremental_energy_J'].cumsum()
     stitched_df.to_csv(output_detail_file, index=False)
 
     print(f"Processed {len(segments)} segments.")
